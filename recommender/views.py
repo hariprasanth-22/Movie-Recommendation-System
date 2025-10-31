@@ -36,7 +36,11 @@ def movie_detail(request, movie_id):
     user_rating = None
     if request.user.is_authenticated:
         try:
-            user_rating = UserRating.objects.get(user=request.user, movie__tmdb_id=movie_id)
+            # Get user's active profile
+            profile = request.user.profile_set.filter(is_active=True).first()
+            if not profile:
+                profile = request.user.profile_set.create(name="Default", profile_type="adult", is_active=True)
+            user_rating = UserRating.objects.get(profile=profile, movie__tmdb_id=movie_id)
         except UserRating.DoesNotExist:
             pass
 
@@ -52,15 +56,29 @@ def movie_detail(request, movie_id):
 @login_required
 def dashboard(request):
     """User dashboard with recommendations and profile."""
-    # Get user's ratings
-    user_ratings = UserRating.objects.filter(user=request.user).select_related('movie')
+    # Get user's active profile (default to first one or create if none)
+    try:
+        profile = request.user.profile_set.filter(is_active=True).first()
+        if not profile:
+            # Create default adult profile
+            profile = request.user.profile_set.create(name="Default", profile_type="adult", is_active=True)
+    except:
+        profile = request.user.profile_set.create(name="Default", profile_type="adult", is_active=True)
+
+    # Get profile's ratings
+    user_ratings = UserRating.objects.filter(profile=profile).select_related('movie')
     rated_movie_ids = [rating.movie.tmdb_id for rating in user_ratings]
 
-    # Get personalized recommendations (for now, just trending movies not rated)
-    all_trending = recommender.get_trending_movies(50)
-    recommendations = [movie for movie in all_trending if movie['id'] not in rated_movie_ids][:10]
+    # Get personalized recommendations
+    try:
+        recommendations = recommender.get_personalized_recommendations(profile, num_recs=10)
+    except:
+        # Fallback to trending
+        all_trending = recommender.get_trending_movies(50)
+        recommendations = [{'movie': movie, 'score': 0.5, 'badges': ['Trending'], 'confidence': 0.5}
+                          for movie in all_trending if movie['id'] not in rated_movie_ids][:10]
 
-    # Get user's preferences
+    # Get user's preferences (legacy support)
     try:
         preferences = UserPreference.objects.get(user=request.user)
     except UserPreference.DoesNotExist:
@@ -70,6 +88,7 @@ def dashboard(request):
         'user_ratings': user_ratings,
         'recommendations': recommendations,
         'preferences': preferences,
+        'profile': profile,
     }
     return render(request, 'recommender/dashboard.html', context)
 
@@ -119,6 +138,14 @@ def rate_movie(request, movie_id):
     except ValueError:
         return JsonResponse({'error': 'Invalid rating'}, status=400)
 
+    # Get user's active profile
+    try:
+        profile = request.user.profile_set.filter(is_active=True).first()
+        if not profile:
+            profile = request.user.profile_set.create(name="Default", profile_type="adult", is_active=True)
+    except:
+        profile = request.user.profile_set.create(name="Default", profile_type="adult", is_active=True)
+
     # Get or create movie
     movie, created = Movie.objects.get_or_create(
         tmdb_id=movie_id,
@@ -134,7 +161,7 @@ def rate_movie(request, movie_id):
 
     # Create or update rating
     rating, created = UserRating.objects.update_or_create(
-        user=request.user,
+        profile=profile,
         movie=movie,
         defaults={'rating': rating_value}
     )
