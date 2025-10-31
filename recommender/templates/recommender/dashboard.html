@@ -1,0 +1,151 @@
+{% extends 'recommender/base.html' %}
+
+{% block title %}Dashboard - Movie Recommender{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8">
+            <h1 class="mb-4">Welcome back, {{ user.username }}!</h1>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Your Movie Ratings</h5>
+                </div>
+                <div class="card-body">
+                    {% if user_ratings %}
+                        <div class="row">
+                            {% for rating in user_ratings %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <a href="{% url 'movie_detail' rating.movie.tmdb_id %}" class="text-decoration-none">{{ rating.movie.title }}</a>
+                                        </h6>
+                                        <p class="card-text small text-muted">{{ rating.movie.genres|join:", " }}</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-star"></i> Your rating: {{ rating.rating }}/5
+                                            </span>
+                                            <small class="text-muted">{{ rating.created_at|date:"M d, Y" }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">You haven't rated any movies yet. <a href="{% url 'home' %}">Start exploring!</a></p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recommended for You</h5>
+                </div>
+                <div class="card-body">
+                    {% if recommendations %}
+                        <div class="row">
+                            {% for movie in recommendations %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <h6 class="card-title">{{ movie.title }}</h6>
+                                        <p class="card-text small text-muted">{{ movie.genres|join:", " }}</p>
+                                        <p class="card-text flex-grow-1 small">{{ movie.overview|truncatechars:80 }}</p>
+                                        <div class="mt-auto">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="fas fa-star"></i> {{ movie.vote_average|floatformat:1 }}
+                                                </span>
+                                                <small class="text-muted">{{ movie.release_year }}</small>
+                                            </div>
+                                            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-primary btn-sm w-100">View Details</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No recommendations available yet. Rate some movies to get personalized suggestions!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Your Preferences</h5>
+                </div>
+                <div class="card-body">
+                    {% if preferences %}
+                        <p><strong>Favorite Genres:</strong> {{ preferences.favorite_genres|join:", " }}</p>
+                        <p><strong>Preferred Actors:</strong> {{ preferences.preferred_actors|join:", " }}</p>
+                    {% else %}
+                        <p class="text-muted">No preferences set yet.</p>
+                    {% endif %}
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#preferencesModal">Update Preferences</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Movies Rated:</strong> {{ user_ratings|length }}</p>
+                    <p><strong>Average Rating:</strong>
+                        {% if user_ratings %}
+                            {% widthratio user_ratings|length 1 1 as count %}
+                            {% for rating in user_ratings %}
+                                {% if forloop.first %}
+                                    {% widthratio rating.rating count 1 as total %}
+                                {% else %}
+                                    {% widthratio rating.rating 1 total|add:total %}
+                                {% endif %}
+                            {% endfor %}
+                            {{ total|floatformat:1 }}/5
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preferences Modal -->
+<div class="modal fade" id="preferencesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Preferences</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'update_preferences' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="genres" class="form-label">Favorite Genres</label>
+                        <input type="text" class="form-control" id="genres" name="genres" value="{% if preferences %}{{ preferences.favorite_genres|join:', ' }}{% endif %}">
+                        <div class="form-text">Separate genres with commas</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="actors" class="form-label">Preferred Actors</label>
+                        <input type="text" class="form-control" id="actors" name="actors" value="{% if preferences %}{{ preferences.preferred_actors|join:', ' }}{% endif %}">
+                        <div class="form-text">Separate actors with commas</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

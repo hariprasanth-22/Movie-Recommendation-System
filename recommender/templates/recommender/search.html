@@ -1,0 +1,45 @@
+{% extends 'recommender/base.html' %}
+
+{% block title %}Search Results - Movie Recommender{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">Search Results</h1>
+
+    {% if query %}
+        <p class="text-muted">Showing results for "{{ query }}"</p>
+    {% endif %}
+
+    {% if movies %}
+        <div class="row">
+            {% for movie in movies %}
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                <div class="card movie-card h-100">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">{{ movie.title }}</h5>
+                        <p class="card-text text-muted small">{{ movie.genres|join:", " }}</p>
+                        <p class="card-text flex-grow-1">{{ movie.overview|truncatechars:100 }}</p>
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-star"></i> {{ movie.vote_average|floatformat:1 }}
+                                </span>
+                                <small class="text-muted">{{ movie.release_year }}</small>
+                            </div>
+                            <a href="{% url 'movie_detail' movie.id %}" class="btn btn-primary btn-sm w-100">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <h3 class="text-muted">No movies found</h3>
+            <p class="text-muted">Try searching with different keywords.</p>
+            <a href="{% url 'home' %}" class="btn btn-primary">Back to Home</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
